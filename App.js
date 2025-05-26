@@ -1,131 +1,76 @@
-import {
-  NavigationContainer
-} from "@react-navigation/native";
-import {
-  createNativeStackNavigator
-} from "@react-navigation/native-stack";
-import React from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+const express = require("express");
+const cors = require("cors");
+const { usuarios, contatos } = require("./data");
 
-function BemVindo() {
-  return (
-    <View style={styles.container}>
-      <Text>Bem-vindo à Aplicação</Text>
-    </View>
-  );
-}
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-function LoginScreen({ navigation }) {
-  return (
-    <View style={styles.container}>
-      <TextInput style={styles.input} placeholder="Nome de Usuário" />
-      <TextInput style={styles.input} placeholder="Senha" secureTextEntry={true} />
-      <TouchableOpacity onPress={() => navigation.navigate("Registro")}>
-        <Text style={styles.button}>Criar Conta</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate("Painel")}>
-        <Text style={styles.button}>Entrar</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+let usuarioIdCounter = usuarios.length + 1;
+let contatoIdCounter = contatos.length + 1;
 
-function PainelPrincipal({ navigation }) {
-  const listaDeContatos = [{ id: 1, nome: "Laiany Eduarda", telefone: "(81) 98196-6221" }];
-
-  return (
-    <View style={styles.container}>
-      {listaDeContatos.map((contato) => (
-        <View key={contato.id}>
-          <Text>Nome: {contato.nome}</Text>
-          <Text>Telefone: {contato.telefone}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate("EditarContato", { contato })}>
-            <Text style={styles.button}>Ver Informações</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function CriarConta({ navigation }) {
-  return (
-    <View style={styles.container}>
-      <TextInput style={styles.input} placeholder="Nome Completo" />
-      <TextInput style={styles.input} placeholder="CPF" />
-      <TextInput style={styles.input} placeholder="E-mail" />
-      <TextInput style={styles.input} placeholder="Senha" secureTextEntry={true} />
-      <TouchableOpacity onPress={() => navigation.navigate("Painel")}>
-        <Text style={styles.button}>Finalizar</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function AdicionarContato({ navigation }) {
-  return (
-    <View style={styles.container}>
-      <TextInput style={styles.input} placeholder="Nome" />
-      <TextInput style={styles.input} placeholder="E-mail" />
-      <TextInput style={styles.input} placeholder="Telefone" />
-      <TouchableOpacity onPress={() => navigation.navigate("Painel")}>
-        <Text style={styles.button}>Adicionar</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function EditarContato({ route }) {
-  const { contato } = route.params;
-
-  return (
-    <View style={styles.container}>
-      <Text>Nome Atual: {contato.nome}</Text>
-      <Text>Telefone Atual: {contato.telefone}</Text>
-      <TextInput style={styles.input} placeholder="Novo Nome" />
-      <TextInput style={styles.input} placeholder="Novo Telefone" />
-      <TouchableOpacity onPress={() => alert("Contato atualizado!")}>
-        <Text style={styles.button}>Salvar Alterações</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => alert("Contato removido!")}>
-        <Text style={styles.button}>Remover Contato</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-const Stack = createNativeStackNavigator();
-
-export default function Aplicativo() {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login">
-        <Stack.Screen name="Bem-vindo" component={BemVindo} />
-        <Stack.Screen name="Registro" component={CriarConta} />
-        <Stack.Screen name="Adicionar" component={AdicionarContato} />
-        <Stack.Screen name="EditarContato" component={EditarContato} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Painel" component={PainelPrincipal} />
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center", 
-    backgroundColor: "#FFD1DC" 
-  },
-  input: { 
-    marginBottom: 10, 
-    width: "80%", 
-    backgroundColor: "#fff", 
-    textAlign: "center" 
-  },
-  button: { 
-    color: "#FF69B4", 
-    fontWeight: "bold" 
-  },
+app.post("/login", (req, res) => {
+  const { usuario, senha } = req.body;
+  const user = usuarios.find(u => u.usuario === usuario && u.senha === senha);
+  if (user) {
+    res.json({ success: true, nome: user.nome });
+  } else {
+    res.status(401).json({ error: "Usuário ou senha inválidos" });
+  }
 });
+
+app.post("/usuarios", (req, res) => {
+  const { nome, cpf, email, senha } = req.body;
+  if (!nome || !cpf || !email || !senha) {
+    return res.status(400).json({ error: "Campos obrigatórios" });
+  }
+
+  if (usuarios.find(u => u.usuario === email)) {
+    return res.status(400).json({ error: "Usuário já existe" });
+  }
+  const newUser = { id: usuarioIdCounter++, usuario: email, senha, nome, cpf, email };
+  usuarios.push(newUser);
+  res.status(201).json(newUser);
+});
+
+app.get("/contatos", (req, res) => {
+  res.json(contatos);
+});
+
+app.post("/contatos", (req, res) => {
+  const { nome, email, telefone } = req.body;
+  if (!nome || !telefone) {
+    return res.status(400).json({ error: "Nome e telefone são obrigatórios" });
+  }
+  const newContato = { id: contatoIdCounter++, nome, email, telefone };
+  contatos.push(newContato);
+  res.status(201).json(newContato);
+});
+
+app.put("/contatos/:id", (req, res) => {
+  const id = parseInt(req.params.id);
+  const contato = contatos.find(c => c.id === id);
+  if (!contato) {
+    return res.status(404).json({ error: "Contato não encontrado" });
+  }
+  const { nome, telefone } = req.body;
+  if (nome) contato.nome = nome;
+  if (telefone) contato.telefone = telefone;
+  res.json(contato);
+});
+
+app.delete("/contatos/:id", (req, res) => {
+  const id = parseInt(req.params.id);
+  const index = contatos.findIndex(c => c.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: "Contato não encontrado" });
+  }
+  contatos.splice(index, 1);
+  res.json({ success: true });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`API rodando na porta ${PORT}`);
+});
+
